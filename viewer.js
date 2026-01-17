@@ -40,55 +40,43 @@ function init() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.getElementById('container').appendChild(renderer.domElement);
 
-    // Improve reflections with a procedural environment
+    // Environment with a neutral tech-theme
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     pmremGenerator.compileEquirectangularShader();
-    
-    // Create a temporary scene for environment generation
-    const envScene = new THREE.Scene();
-    const envLight = new THREE.PointLight(0xffffff, 50, 100);
-    envLight.position.set(5, 5, 5);
-    envScene.add(envLight);
-    const envLight2 = new THREE.PointLight(0x667eea, 50, 100);
-    envLight2.position.set(-5, -5, -5);
-    envScene.add(envLight2);
-    
-    scene.environment = pmremGenerator.fromScene(envScene).texture;
+    scene.environment = pmremGenerator.fromScene(new THREE.Scene()).texture;
 
-    // Add lights - Professional Studio Setup
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    // Add lights - Reverted to the "Awesome" Balanced Setup
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x050510, 1.0);
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x101020, 1.0);
     scene.add(hemiLight);
 
     // Key Light
-    const mainLight = new THREE.DirectionalLight(0xffffff, 2.0);
-    mainLight.position.set(15, 25, 15);
+    const mainLight = new THREE.DirectionalLight(0xffffff, 1.8);
+    mainLight.position.set(10, 20, 10);
     mainLight.castShadow = true;
-    mainLight.shadow.mapSize.width = 4096; // Sharper shadows
-    mainLight.shadow.mapSize.height = 4096;
-    mainLight.shadow.camera.near = 0.5;
-    mainLight.shadow.camera.far = 100;
-    mainLight.shadow.bias = -0.0001;
+    mainLight.shadow.mapSize.width = 2048;
+    mainLight.shadow.mapSize.height = 2048;
     scene.add(mainLight);
 
-    // Rim Light (Blue)
-    const rimLight = new THREE.SpotLight(0x667eea, 40);
-    rimLight.position.set(-20, 20, -20);
-    rimLight.angle = Math.PI / 4;
-    rimLight.penumbra = 0.5;
-    scene.add(rimLight);
-
-    // Fill Light (Purple)
-    const fillLight = new THREE.DirectionalLight(0x764ba2, 0.8);
-    fillLight.position.set(-15, 5, 10);
+    // Subtle Fill Light
+    const fillLight = new THREE.DirectionalLight(0x764ba2, 0.4);
+    fillLight.position.set(-10, 10, -10);
     scene.add(fillLight);
 
-    // Subtle blue "tech" glow from below
-    const bottomLight = new THREE.PointLight(0x667eea, 30, 60);
-    bottomLight.position.set(0, -10, 0);
+    // Low-level Tech Glow
+    const bottomLight = new THREE.PointLight(0x667eea, 15, 40);
+    bottomLight.position.set(0, -5, 0);
     scene.add(bottomLight);
+
+    // Dynamic High-Fidelity Shadow Light
+    const shadowLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    shadowLight.position.set(0, 50, 0);
+    shadowLight.castShadow = true;
+    shadowLight.shadow.mapSize.width = 1024;
+    shadowLight.shadow.mapSize.height = 1024;
+    scene.add(shadowLight);
 
     // Add controls
     controls = new OrbitControls(camera, renderer.domElement);
@@ -101,6 +89,15 @@ function init() {
     // Initial grid (will be resized)
     gridHelper = new THREE.GridHelper(20, 20, 0x667eea, 0x222222);
     scene.add(gridHelper);
+
+    // Add Ground Plane (for shadows)
+    const groundGeo = new THREE.PlaneGeometry(100, 100);
+    const groundMat = new THREE.ShadowMaterial({ opacity: 0.3 });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = 0;
+    ground.receiveShadow = true;
+    scene.add(ground);
 
     // Add axes helper
     const axesHelper = new THREE.AxesHelper(5);
@@ -166,6 +163,9 @@ function identifyPart(object) {
     
     object.material = highlightMaterial;
     
+    // Smoothly focus camera on the identified part
+    focusCameraOnObject(object);
+
     // Update UI
     const partInfo = document.getElementById('part-info');
     const partName = document.getElementById('part-name');
@@ -180,6 +180,20 @@ function identifyPart(object) {
     console.log('Identified Part:', object.name, object);
 }
 
+function focusCameraOnObject(object) {
+    const box = new THREE.Box3().setFromObject(object);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    
+    // Calculate new target and slightly move camera
+    const targetPos = center.clone();
+    
+    // Animate controls target smoothly (basic version)
+    controls.target.lerp(targetPos, 0.5);
+    controls.update();
+}
+
 function clearIdentification() {
     if (selectedObject && originalMaterials.has(selectedObject)) {
         selectedObject.material = originalMaterials.get(selectedObject);
@@ -188,6 +202,7 @@ function clearIdentification() {
     selectedObject = null;
     document.getElementById('part-info').style.display = 'none';
 }
+window.clearIdentification = clearIdentification;
 
 function setupFileUpload() {
     const fileInput = document.getElementById('fileInput');
@@ -335,54 +350,68 @@ function processLoadedModel(object, filename) {
     gridHelper = new THREE.GridHelper(targetDim * 2, 20, 0x667eea, 0x222222);
     scene.add(gridHelper);
 
-    // 4. Material Extraction & Upgrade
+    // 4. Mesh & Material Integrity Engine
     model.traverse((child) => {
         if (child.isMesh) {
+            // Shadow & Culling Optimization
             child.castShadow = true;
             child.receiveShadow = true;
-            child.frustumCulled = false;
+            child.frustumCulled = false; // Prevent high-poly meshes from popping out
             
-            if (child.material) {
-                const upgrade = (m) => {
-                    // Detect if this is a "glow" material
-                    const isGlow = (m.emissive && (m.emissive.r > 0 || m.emissive.g > 0 || m.emissive.b > 0)) || 
-                                   (m.name && (m.name.toLowerCase().includes('glass') || m.name.toLowerCase().includes('glow') || m.name.toLowerCase().includes('light')));
-
-                    const newMat = new THREE.MeshStandardMaterial({
-                        name: m.name,
-                        color: m.color ? m.color.clone() : 0xcccccc,
-                        map: m.map,
-                        normalMap: m.normalMap,
-                        roughnessMap: m.roughnessMap || null,
-                        metalnessMap: m.metalnessMap || null,
-                        aoMap: m.aoMap || null,
-                        roughness: isGlow ? 0.05 : (m.roughness !== undefined ? m.roughness : 0.4),
-                        metalness: isGlow ? 1.0 : (m.metalness !== undefined ? m.metalness : 0.6),
-                        emissive: m.emissive ? m.emissive.clone() : 0x000000,
-                        emissiveIntensity: isGlow ? 2.5 : (m.emissiveIntensity || 1.0),
-                        transparent: m.transparent || m.opacity < 1,
-                        opacity: m.opacity,
-                        side: THREE.DoubleSide,
-                        envMapIntensity: 1.5 // Boost reflections
-                    });
-
-                    // If it's a dark color and not a glow, bump it so it's not "black hole" dark
-                    if (!isGlow && newMat.color.r < 0.03 && newMat.color.g < 0.03 && newMat.color.b < 0.03) {
-                        newMat.color.setHex(0x2a2a2a);
-                    }
-
-                    return newMat;
-                };
-
-                if (Array.isArray(child.material)) {
-                    child.material = child.material.map(upgrade);
-                } else {
-                    child.material = upgrade(child.material);
+            // Geometry refinement
+            if (child.geometry) {
+                // Ensure normals exist for shading. 
+                // Don't recompute if they already exist to preserve custom smoothing/hard edges.
+                if (!child.geometry.attributes.normal) {
+                    child.geometry.computeVertexNormals();
+                }
+                
+                // Generate tangents for better Normal Map quality if a normal map is present
+                if (child.material && (child.material.normalMap || (Array.isArray(child.material) && child.material.some(m => m.normalMap)))) {
+                    child.geometry.computeTangents();
                 }
             }
 
-            if (child.geometry) {
-                child.geometry.computeVertexNormals();
+            if (child.material) {
+                const refineMaterial = (m) => {
+                    // 1. Structural Integrity
+                    m.side = THREE.DoubleSide; // Ensure no "holes" in mecha armor
+                    
+                    // 2. Vertex Color Support (Common in detailed mecha for secondary detail)
+                    if (child.geometry && child.geometry.attributes.color) {
+                        m.vertexColors = true;
+                    }
+
+                    // 3. PBR Refinement for high-fidelity meshes
+                    if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+                        m.envMapIntensity = 1.0;
+                        
+                        // Preserve high-poly micro-detail:
+                        // Ensure normal maps have full scale/strength
+                        if (m.normalScale) m.normalScale.set(1, 1);
+                        
+                        // Mecha metalness refinement
+                        if (m.name && (m.name.toLowerCase().includes('metal') || m.name.toLowerCase().includes('armor'))) {
+                            m.metalness = Math.max(m.metalness, 0.7);
+                            m.roughness = Math.min(m.roughness, 0.3);
+                        }
+                    }
+
+                    // 4. Alpha/Transparency Fixes
+                    // Some FBX exports set transparency incorrectly. If it looks "ghostly", we fix it.
+                    if (m.opacity < 0.05) {
+                        m.transparent = false;
+                        m.opacity = 1.0;
+                    }
+
+                    return m;
+                };
+
+                if (Array.isArray(child.material)) {
+                    child.material = child.material.map(refineMaterial);
+                } else {
+                    child.material = refineMaterial(child.material);
+                }
             }
         }
     });

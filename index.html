@@ -28,18 +28,21 @@
 
         <!-- Skeleton Analysis Section -->
         <div id="skeleton-section" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); display: none;">
-            <p style="color: #667eea; font-weight: bold; margin-bottom: 5px;">🦴 Skeleton Engine</p>
-            <p id="skeleton-status" style="font-size: 12px; margin-bottom: 10px; opacity: 0.8;">Analyzing structure...</p>
-            <button onclick="toggleSkeleton()" style="width: 100%; padding: 8px; background: rgba(102, 126, 234, 0.2); border: 1px solid #667eea; color: white; border-radius: 4px; cursor: pointer; font-size: 11px;">
-                Toggle Skeleton View
+            <p style="color: #667eea; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; font-size: 11px;">🦴 Skeleton Engine</p>
+            <p id="skeleton-status" style="font-size: 11px; margin-bottom: 10px; opacity: 0.8; font-family: monospace;">Analyzing structure...</p>
+            <button onclick="toggleSkeleton()" style="width: 100%; padding: 10px; background: rgba(102, 126, 234, 0.1); border: 1px solid rgba(102, 126, 234, 0.5); color: white; border-radius: 4px; cursor: pointer; font-size: 10px; text-transform: uppercase; transition: background 0.3s;">
+                Toggle X-Ray Skeleton
             </button>
         </div>
     </div>
 
     <!-- Independent Part Info Panel -->
-    <div id="part-info" style="display: none;">
-        <p id="part-name">Selected Part: Name</p>
-        <p id="part-details">Details: Type | Vertices</p>
+    <div id="part-info" style="display: none; position: fixed; top: 20px; right: 20px; background: rgba(5, 5, 16, 0.8); backdrop-filter: blur(20px); border-left: 4px solid #667eea; padding: 20px; color: white; z-index: 100; min-width: 280px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border-radius: 4px;">
+        <p style="font-size: 10px; color: #667eea; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 5px;">Part Identified</p>
+        <h2 id="part-name" style="font-size: 18px; font-weight: 300; margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Selected Part</h2>
+        <div style="height: 1px; background: rgba(255,255,255,0.1); margin-bottom: 15px;"></div>
+        <p id="part-details" style="font-size: 11px; font-family: monospace; opacity: 0.7; line-height: 1.6;">Details: Type | Vertices</p>
+        <button onclick="clearIdentification()" style="margin-top: 15px; background: none; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.5); padding: 5px 10px; border-radius: 3px; font-size: 10px; cursor: pointer; float: right;">CLOSE</button>
     </div>
 
     <div id="loading">
