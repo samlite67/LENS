@@ -6,12 +6,19 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 let scene, camera, renderer, controls;
 let model, gridHelper;
+let raycaster, mouse;
+let selectedObject = null;
+let originalMaterials = new Map();
 
 function init() {
     // Create scene
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x050510); // Darker background
     scene.fog = new THREE.Fog(0x050510, 20, 100);
+
+    // Add raycaster and mouse
+    raycaster = new THREE.Raycaster();
+    mouse = new THREE.Vector2();
 
     // Create camera
     camera = new THREE.PerspectiveCamera(
@@ -86,8 +93,77 @@ function init() {
     // Handle window resize
     window.addEventListener('resize', onWindowResize);
 
+    // Handle identification
+    renderer.domElement.addEventListener('dblclick', onMouseDoubleClick);
+
     // Start animation loop
     animate();
+}
+
+function onMouseDoubleClick(event) {
+    // Calculate normalized mouse coordinates
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // Perform raycasting
+    raycaster.setFromCamera(mouse, camera);
+    if (!model) return;
+
+    const intersects = raycaster.intersectObject(model, true);
+
+    if (intersects.length > 0) {
+        const object = intersects[0].object;
+        identifyPart(object);
+    } else {
+        clearIdentification();
+    }
+}
+
+function identifyPart(object) {
+    // Clear previous selection
+    clearIdentification();
+    
+    selectedObject = object;
+    
+    // Store original materials if not already stored
+    if (!originalMaterials.has(object)) {
+        originalMaterials.set(object, object.material);
+    }
+    
+    // Highlight the object
+    const highlightMaterial = new THREE.MeshStandardMaterial({
+        color: 0x667eea,
+        emissive: 0x667eea,
+        emissiveIntensity: 0.5,
+        transparent: true,
+        opacity: 0.8,
+        wireframe: false,
+        side: THREE.DoubleSide
+    });
+    
+    object.material = highlightMaterial;
+    
+    // Update UI
+    const partInfo = document.getElementById('part-info');
+    const partName = document.getElementById('part-name');
+    const partDetails = document.getElementById('part-details');
+    
+    partInfo.style.display = 'block';
+    partName.textContent = object.name || 'Unnamed Mesh';
+    
+    const vertexCount = object.geometry.attributes.position.count;
+    partDetails.textContent = `Type: ${object.type} | Vertices: ${vertexCount.toLocaleString()}`;
+    
+    console.log('Identified Part:', object.name, object);
+}
+
+function clearIdentification() {
+    if (selectedObject && originalMaterials.has(selectedObject)) {
+        selectedObject.material = originalMaterials.get(selectedObject);
+    }
+    
+    selectedObject = null;
+    document.getElementById('part-info').style.display = 'none';
 }
 
 function setupFileUpload() {
@@ -99,6 +175,9 @@ function setupFileUpload() {
 
         console.log('File selected:', file.name, file.type);
         
+        // Clear previous identification
+        clearIdentification();
+
         // Remove existing model
         if (model) {
             scene.remove(model);

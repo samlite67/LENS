@@ -89,3 +89,32 @@ body {
     font-size: 16px;
     margin-top: 10px;
 }
+
+#part-info {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(102, 126, 234, 0.15);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    padding: 20px;
+    border-radius: 12px;
+    color: white;
+    z-index: 100;
+    min-width: 250px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+    transition: all 0.3s ease;
+}
+
+#part-name {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #667eea;
+}
+
+#part-details {
+    font-size: 12px;
+    opacity: 0.8;
+}
