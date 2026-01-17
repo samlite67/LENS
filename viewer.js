@@ -258,6 +258,7 @@ function processLoadedModel(object, filename) {
         if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
+            child.frustumCulled = false; // Prevents parts from disappearing at certain angles
             
             if (child.material) {
                 const upgradeMaterial = (mat) => {
@@ -271,9 +272,11 @@ function processLoadedModel(object, filename) {
                         color: color,
                         map: mat.map,
                         normalMap: mat.normalMap,
-                        roughness: 0.5,
-                        metalness: 0.5,
-                        side: THREE.DoubleSide
+                        roughness: 0.4,
+                        metalness: 0.6,
+                        side: THREE.DoubleSide,
+                        transparent: mat.transparent || (mat.opacity < 1),
+                        opacity: mat.opacity
                     });
                 };
 
@@ -282,6 +285,11 @@ function processLoadedModel(object, filename) {
                 } else {
                     child.material = upgradeMaterial(child.material);
                 }
+            }
+
+            // Ensure smooth shading
+            if (child.geometry) {
+                child.geometry.computeVertexNormals();
             }
         }
     });
