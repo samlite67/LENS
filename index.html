@@ -16,33 +16,43 @@
             <p>🖱️ Scroll: Zoom</p>
             <p>🖱️ Double Click: Identify Part</p>
         </div>
-        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2);">
-            <label for="fileInput" style="display: block; margin-bottom: 10px; cursor: pointer; padding: 10px; background: linear-gradient(45deg, #667eea, #764ba2); border-radius: 5px; text-align: center;">
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(0, 0, 0, 0.05);">
+            <label for="fileInput" style="display: block; margin-bottom: 10px; cursor: pointer; padding: 12px; background: #667eea; color: white; border-radius: 8px; text-align: center; font-size: 13px; font-weight: 500; transition: transform 0.2s;">
                 📁 Load 3D File (FBX/OBJ/GLB/GLTF)
             </label>
             <input type="file" id="fileInput" accept=".fbx,.obj,.glb,.gltf" style="display: none;">
         </div>
         <div style="margin-top: 10px;">
-            <a href="test-engine.html" style="color: #667eea; text-decoration: none; font-size: 12px;">🔧 Test Engine</a>
+            <a href="test-engine.html" style="color: #94a3b8; text-decoration: none; font-size: 11px; letter-spacing: 1px;">🔧 TEST ENGINE</a>
         </div>
 
         <!-- Skeleton Analysis Section -->
-        <div id="skeleton-section" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); display: none;">
+        <div id="skeleton-section" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(0, 0, 0, 0.05); display: none;">
             <p style="color: #667eea; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; font-size: 11px;">🦴 Skeleton Engine</p>
-            <p id="skeleton-status" style="font-size: 11px; margin-bottom: 10px; opacity: 0.8; font-family: monospace;">Analyzing structure...</p>
-            <button onclick="toggleSkeleton()" style="width: 100%; padding: 10px; background: rgba(102, 126, 234, 0.1); border: 1px solid rgba(102, 126, 234, 0.5); color: white; border-radius: 4px; cursor: pointer; font-size: 10px; text-transform: uppercase; transition: background 0.3s;">
+            <p id="skeleton-status" style="font-size: 10px; margin-bottom: 10px; color: #94a3b8; font-family: monospace;">Analyzing structure...</p>
+            <button onclick="toggleSkeleton()" style="width: 100%; padding: 10px; background: rgba(102, 126, 234, 0.05); border: 1px solid rgba(102, 126, 234, 0.2); color: #667eea; border-radius: 6px; cursor: pointer; font-size: 10px; font-weight: 600; text-transform: uppercase; transition: all 0.3s;">
                 Toggle X-Ray Skeleton
             </button>
+        </div>
+
+        <!-- View Modes Section -->
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(0, 0, 0, 0.05);">
+            <p style="color: #667eea; font-weight: bold; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; font-size: 11px;">👁️ View Modes</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px;">
+                <button onclick="setViewMode('material')" class="mode-btn active" id="btn-material">PBR</button>
+                <button onclick="setViewMode('solid')" class="mode-btn" id="btn-solid">Solid</button>
+                <button onclick="setViewMode('wireframe')" class="mode-btn" id="btn-wireframe">Wire</button>
+            </div>
         </div>
     </div>
 
     <!-- Independent Part Info Panel -->
-    <div id="part-info" style="display: none; position: fixed; top: 20px; right: 20px; background: rgba(5, 5, 16, 0.8); backdrop-filter: blur(20px); border-left: 4px solid #667eea; padding: 20px; color: white; z-index: 100; min-width: 280px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border-radius: 4px;">
-        <p style="font-size: 10px; color: #667eea; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 5px;">Part Identified</p>
-        <h2 id="part-name" style="font-size: 18px; font-weight: 300; margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Selected Part</h2>
-        <div style="height: 1px; background: rgba(255,255,255,0.1); margin-bottom: 15px;"></div>
-        <p id="part-details" style="font-size: 11px; font-family: monospace; opacity: 0.7; line-height: 1.6;">Details: Type | Vertices</p>
-        <button onclick="clearIdentification()" style="margin-top: 15px; background: none; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.5); padding: 5px 10px; border-radius: 3px; font-size: 10px; cursor: pointer; float: right;">CLOSE</button>
+    <div id="part-info" style="display: none; position: fixed; top: 20px; right: 20px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(20px); border-left: 4px solid #667eea; padding: 20px; color: #2c3e50; z-index: 100; min-width: 280px; box-shadow: 0 10px 40px rgba(0,0,0,0.05); border-radius: 8px;">
+        <p style="font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 5px; font-weight: 600;">System Analytics</p>
+        <h2 id="part-name" style="font-size: 18px; font-weight: 600; margin-bottom: 10px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Selected Part</h2>
+        <div style="height: 1px; background: rgba(0,0,0,0.05); margin-bottom: 15px;"></div>
+        <p id="part-details" style="font-size: 11px; font-family: 'Segoe UI', sans-serif; color: #64748b; line-height: 1.6;">Details: Type | Vertices</p>
+        <button onclick="clearIdentification()" style="margin-top: 15px; background: none; border: 1px solid rgba(0,0,0,0.1); color: #94a3b8; padding: 5px 12px; border-radius: 4px; font-size: 10px; font-weight: 600; cursor: pointer; float: right; transition: all 0.2s;">CLOSE</button>
     </div>
 
     <div id="loading">

@@ -10,12 +10,19 @@ let raycaster, mouse;
 let selectedObject = null;
 let originalMaterials = new Map();
 let bones = [];
+let currentViewMode = 'material';
+let solidMaterial = new THREE.MeshStandardMaterial({
+    color: 0xe0e0e0, // Slightly lighter for the lab theme
+    roughness: 0.6,
+    metalness: 0.2,
+    side: THREE.DoubleSide
+});
 
 function init() {
     // Create scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050510); // Darker background
-    scene.fog = new THREE.Fog(0x050510, 20, 100);
+    scene.background = new THREE.Color(0xf5f7fa); // Elegant "Soft White" Lab background
+    scene.fog = new THREE.Fog(0xf5f7fa, 50, 200);
 
     // Add raycaster and mouse
     raycaster = new THREE.Raycaster();
@@ -36,6 +43,7 @@ function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
+    renderer.outputColorSpace = THREE.SRGBColorSpace; // Critical for correct color rendering
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.getElementById('container').appendChild(renderer.domElement);
@@ -45,33 +53,33 @@ function init() {
     pmremGenerator.compileEquirectangularShader();
     scene.environment = pmremGenerator.fromScene(new THREE.Scene()).texture;
 
-    // Add lights - Reverted to the "Awesome" Balanced Setup
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // Add lights - Elegant Lab Setup
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Brighter ambient
     scene.add(ambientLight);
 
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x101020, 1.0);
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xe0e0e0, 1.0);
     scene.add(hemiLight);
 
-    // Key Light
-    const mainLight = new THREE.DirectionalLight(0xffffff, 1.8);
-    mainLight.position.set(10, 20, 10);
+    // Key Light - Clean White
+    const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    mainLight.position.set(10, 25, 15);
     mainLight.castShadow = true;
     mainLight.shadow.mapSize.width = 2048;
     mainLight.shadow.mapSize.height = 2048;
     scene.add(mainLight);
 
-    // Subtle Fill Light
-    const fillLight = new THREE.DirectionalLight(0x764ba2, 0.4);
+    // Subtle Soft Fill
+    const fillLight = new THREE.DirectionalLight(0x667eea, 0.2); // Very subtle blue tint
     fillLight.position.set(-10, 10, -10);
     scene.add(fillLight);
 
-    // Low-level Tech Glow
-    const bottomLight = new THREE.PointLight(0x667eea, 15, 40);
+    // Clean neutral glow from below
+    const bottomLight = new THREE.PointLight(0xffffff, 10, 50);
     bottomLight.position.set(0, -5, 0);
     scene.add(bottomLight);
 
     // Dynamic High-Fidelity Shadow Light
-    const shadowLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    const shadowLight = new THREE.DirectionalLight(0xffffff, 0.3);
     shadowLight.position.set(0, 50, 0);
     shadowLight.castShadow = true;
     shadowLight.shadow.mapSize.width = 1024;
@@ -86,8 +94,10 @@ function init() {
     controls.minDistance = 2;
     controls.maxDistance = 100;
 
-    // Initial grid (will be resized)
-    gridHelper = new THREE.GridHelper(20, 20, 0x667eea, 0x222222);
+    // Initial grid (Transparent/Subtle)
+    gridHelper = new THREE.GridHelper(20, 40, 0x667eea, 0xcccccc);
+    gridHelper.material.opacity = 0.2;
+    gridHelper.material.transparent = true;
     scene.add(gridHelper);
 
     // Add Ground Plane (for shadows)
@@ -249,9 +259,14 @@ function setupFileUpload() {
 }
 
 function loadFBXFromFile(url, filename) {
-    const loader = new FBXLoader();
+    const loadingManager = new THREE.LoadingManager();
+    const loader = new FBXLoader(loadingManager);
     const loadingElement = document.getElementById('loading');
     const infoText = document.querySelector('#info p');
+
+    loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+        infoText.textContent = `Loading Textures: ${Math.round((itemsLoaded / itemsTotal) * 100)}%`;
+    };
 
     loader.load(
         url,
@@ -260,9 +275,10 @@ function loadFBXFromFile(url, filename) {
             URL.revokeObjectURL(url);
         },
         (xhr) => {
-            const percentComplete = (xhr.loaded / xhr.total) * 100;
-            console.log(`Loading: ${percentComplete.toFixed(2)}%`);
-            infoText.textContent = `Loading: ${percentComplete.toFixed(0)}%`;
+            if (xhr.lengthComputable) {
+                const percentComplete = (xhr.loaded / xhr.total) * 100;
+                infoText.textContent = `Downloading: ${percentComplete.toFixed(0)}%`;
+            }
         },
         (error) => {
             console.error('Error loading FBX:', error);
@@ -273,8 +289,9 @@ function loadFBXFromFile(url, filename) {
 }
 
 function loadOBJFromFile(url, filename) {
-    const loader = new OBJLoader();
-    const loadingElement = document.getElementById('loading');
+    const loadingManager = new THREE.LoadingManager();
+    const loader = new OBJLoader(loadingManager);
+    const infoText = document.querySelector('#info p');
 
     loader.load(
         url,
@@ -283,20 +300,22 @@ function loadOBJFromFile(url, filename) {
             URL.revokeObjectURL(url);
         },
         (xhr) => {
-            const percentComplete = (xhr.loaded / xhr.total) * 100;
-            console.log(`Loading: ${percentComplete.toFixed(2)}%`);
+            if (xhr.lengthComputable) {
+                const percentComplete = (xhr.loaded / xhr.total) * 100;
+                infoText.textContent = `Downloading: ${percentComplete.toFixed(0)}%`;
+            }
         },
         (error) => {
             console.error('Error loading OBJ:', error);
-            loadingElement.querySelector('p').textContent = 'Error loading file';
             URL.revokeObjectURL(url);
         }
     );
 }
 
 function loadGLTFFromFile(url, filename) {
-    const loader = new GLTFLoader();
-    const loadingElement = document.getElementById('loading');
+    const loadingManager = new THREE.LoadingManager();
+    const loader = new GLTFLoader(loadingManager);
+    const infoText = document.querySelector('#info p');
 
     loader.load(
         url,
@@ -305,12 +324,13 @@ function loadGLTFFromFile(url, filename) {
             URL.revokeObjectURL(url);
         },
         (xhr) => {
-            const percentComplete = (xhr.loaded / xhr.total) * 100;
-            console.log(`Loading: ${percentComplete.toFixed(2)}%`);
+            if (xhr.lengthComputable) {
+                const percentComplete = (xhr.loaded / xhr.total) * 100;
+                infoText.textContent = `Downloading: ${percentComplete.toFixed(0)}%`;
+            }
         },
         (error) => {
             console.error('Error loading GLTF:', error);
-            loadingElement.querySelector('p').textContent = 'Error loading file';
             URL.revokeObjectURL(url);
         }
     );
@@ -382,7 +402,16 @@ function processLoadedModel(object, filename) {
                         m.vertexColors = true;
                     }
 
-                    // 3. PBR Refinement for high-fidelity meshes
+                    // 3. Texture Dependency & Color Space Correction
+                    const textureMaps = ['map', 'emissiveMap', 'specularMap', 'glossinessMap'];
+                    textureMaps.forEach(mapName => {
+                        if (m[mapName]) {
+                            m[mapName].colorSpace = THREE.SRGBColorSpace;
+                            m[mapName].needsUpdate = true;
+                        }
+                    });
+
+                    // 4. PBR Refinement for high-fidelity meshes
                     if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
                         m.envMapIntensity = 1.0;
                         
@@ -412,6 +441,9 @@ function processLoadedModel(object, filename) {
                 } else {
                     child.material = refineMaterial(child.material);
                 }
+
+                // Store refined material for view mode switching
+                child.userData.pbrMaterial = child.material;
             }
         }
     });
@@ -420,6 +452,9 @@ function processLoadedModel(object, filename) {
     camera.position.set(targetDim, targetDim * 0.7, targetDim);
     controls.target.set(0, targetDim / 2, 0);
     controls.update();
+
+    // Reset View Mode to Material on load
+    setViewMode('material');
 
     // 7. Skeleton Analysis
     setupSkeleton(model);
@@ -479,6 +514,44 @@ function analyzeBoneMovements(bones) {
     }
 }
 
+function setViewMode(mode) {
+    if (!model) return;
+    currentViewMode = mode;
+
+    // Update UI buttons
+    document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(`btn-${mode}`).classList.add('active');
+
+    model.traverse((child) => {
+        if (child.isMesh) {
+            // Restore previous PBR material first if it exists in userData
+            if (child.userData.pbrMaterial) {
+                child.material = child.userData.pbrMaterial;
+            }
+
+            const applyMode = (m) => {
+                if (mode === 'wireframe') {
+                    m.wireframe = true;
+                } else if (mode === 'solid') {
+                    m.wireframe = false;
+                    // We swap the material but keep properties like DoubleSide
+                    return solidMaterial;
+                } else {
+                    m.wireframe = false;
+                }
+                return m;
+            };
+
+            if (Array.isArray(child.material)) {
+                child.material = child.material.map(applyMode);
+            } else {
+                child.material = applyMode(child.material);
+            }
+        }
+    });
+}
+window.setViewMode = setViewMode;
+
 function analyzeMechanicalHierarchy(object) {
     // For models without weights but structured for animation
     let jointCount = 0;
@@ -517,9 +590,15 @@ function toggleSkeleton() {
 window.toggleSkeleton = toggleSkeleton;
 
 function loadModel() {
-    const loader = new FBXLoader();
+    const loadingManager = new THREE.LoadingManager();
+    const loader = new FBXLoader(loadingManager);
     const loadingElement = document.getElementById('loading');
     const infoText = document.querySelector('#info p');
+
+    loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+        const percent = (itemsLoaded / itemsTotal) * 100;
+        infoText.textContent = `Loading Assets: ${percent.toFixed(0)}%`;
+    };
 
     loader.load(
         'source/Dyan_v06_t05.fbx',
@@ -527,8 +606,10 @@ function loadModel() {
             processLoadedModel(object, 'Dyan_v06_t05.fbx');
         },
         (xhr) => {
-            const percentComplete = (xhr.loaded / (xhr.total || 1)) * 100;
-            infoText.textContent = `Loading: ${percentComplete.toFixed(0)}%`;
+            if (xhr.lengthComputable) {
+                const percentComplete = (xhr.loaded / xhr.total) * 100;
+                infoText.textContent = `Downloading Model: ${percentComplete.toFixed(0)}%`;
+            }
         },
         (error) => {
             console.error('Error loading model:', error);
