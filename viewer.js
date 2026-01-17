@@ -486,11 +486,62 @@ function setupSkeleton(object) {
         
         // Analyze movement potential
         analyzeBoneMovements(bones);
-        updateSkeletonUI(true);
+        updateSkeletonUI(true, false);
     } else {
-        console.log('No skeleton found in model. Analyzing hierarchy for mechanical joints...');
-        analyzeMechanicalHierarchy(object);
-        updateSkeletonUI(false);
+        console.log('No skeleton found in model. Initiating Auto-Rig Engine for Mechanical Hierarchy...');
+        autoRigMechanicalModel(object);
+    }
+}
+
+function autoRigMechanicalModel(object) {
+    const virtualBones = [];
+    
+    // Step 1: Filter and identify significant mechanical pivots (Groups or Meshes with children)
+    object.traverse((child) => {
+        if (child.children.length > 0 && child !== object) {
+            // Create a virtual bone at this pivot's location
+            const vBone = new THREE.Bone();
+            vBone.name = "vBone_" + (child.name || child.uuid.substring(0, 5));
+            
+            // Map the virtual bone to the world position of the mesh pivot
+            const worldPos = new THREE.Vector3();
+            child.getWorldPosition(worldPos);
+            vBone.position.copy(worldPos);
+            
+            // Link the bone to the mesh for reference
+            child.userData.virtualBone = vBone;
+            virtualBones.push(vBone);
+        }
+    });
+
+    if (virtualBones.length > 0) {
+        // Step 2: Build the Bone hierarchy matching the Mesh hierarchy
+        virtualBones.forEach(vBone => {
+            // Find the mesh associated with this bone
+            let sourceMesh = null;
+            object.traverse(c => { if(c.userData.virtualBone === vBone) sourceMesh = c; });
+            
+            if (sourceMesh && sourceMesh.parent && sourceMesh.parent.userData.virtualBone) {
+                sourceMesh.parent.userData.virtualBone.add(vBone);
+                // Make the position relative to parent bone
+                const parentWorldPos = new THREE.Vector3();
+                sourceMesh.parent.getWorldPosition(parentWorldPos);
+                vBone.position.sub(parentWorldPos);
+            } else {
+                scene.add(vBone); // Root bone
+            }
+        });
+
+        bones = virtualBones;
+        skeletonHelper = new THREE.SkeletonHelper(virtualBones[0]);
+        skeletonHelper.visible = false;
+        scene.add(skeletonHelper);
+        
+        console.log(`Auto-Rig Generated: ${bones.length} virtual joints mapped to mechanical pivots.`);
+        updateSkeletonUI(true, true);
+    } else {
+        console.log('Model is a static single mesh. No joints identified.');
+        updateSkeletonUI(false, false);
     }
 }
 
@@ -552,32 +603,22 @@ function setViewMode(mode) {
 }
 window.setViewMode = setViewMode;
 
-function analyzeMechanicalHierarchy(object) {
-    // For models without weights but structured for animation
-    let jointCount = 0;
-    const mechanicalJoints = [];
-    
-    object.traverse((child) => {
-        // If an object has children and is not the root, it's likely a pivot point
-        if (child.children.length > 0 && child !== object) {
-            jointCount++;
-            mechanicalJoints.push(child.name);
-        }
-    });
-    
-    console.log(`Found ${jointCount} potential mechanical joints.`);
-    if (jointCount > 0) {
-        console.log('Recommended Animation Strategy: Hierarchical Rotation (Forward Kinematics)');
-    }
-}
-
-function updateSkeletonUI(hasSkeleton) {
+function updateSkeletonUI(hasSkeleton, isAutoRigged) {
     const skeletonSection = document.getElementById('skeleton-section');
     if (skeletonSection) {
         skeletonSection.style.display = 'block';
         const status = document.getElementById('skeleton-status');
         if (status) {
-            status.textContent = hasSkeleton ? `Rig Detected: ${bones.length} Bones` : 'No Rig detected (Mechanical Hierarchy Only)';
+            if (isAutoRigged) {
+                status.textContent = `Auto-Rig: ${bones.length} Virtual Joints`;
+                status.style.color = '#38bdf8'; // Sky blue for auto-rig
+            } else if (hasSkeleton) {
+                status.textContent = `Rig Detected: ${bones.length} Bones`;
+                status.style.color = '#667eea'; // Standard purple for detected rig
+            } else {
+                status.textContent = 'Static Model (No Joints Found)';
+                status.style.color = '#94a3b8';
+            }
         }
     }
 }
