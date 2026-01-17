@@ -71,7 +71,9 @@ function init() {
 
     // Add axes helper
     const axesHelper = new THREE.AxesHelper(5);
-    scene.addefault FBX model
+    scene.add(axesHelper);
+
+    // Load default FBX model
     loadModel();
 
     // Handle file upload

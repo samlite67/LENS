@@ -1,0 +1,24 @@
+{
+  "name": "lens",
+  "version": "1.0.0",
+  "description": "",
+  "main": "test-engine.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/samlite67/LENS.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/samlite67/LENS/issues"
+  },
+  "homepage": "https://github.com/samlite67/LENS#readme",
+  "devDependencies": {
+    "three": "^0.182.0"
+  }
+}
