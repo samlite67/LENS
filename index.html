@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LENS - 3D Model Viewer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="info">
+        <h1>LENS 3D Viewer</h1>
+        <p>Loading model... Please wait.</p>
+        <div id="controls">
+            <p>🖱️ Left Click + Drag: Rotate</p>
+            <p>🖱️ Right Click + Drag: Pan</p>
+            <p>🖱️ Scroll: Zoom</p>
+        </div>
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2);">
+            <label for="fileInput" style="display: block; margin-bottom: 10px; cursor: pointer; padding: 10px; background: linear-gradient(45deg, #667eea, #764ba2); border-radius: 5px; text-align: center;">
+                📁 Load 3D File (FBX/OBJ/GLB/GLTF)
+            </label>
+            <input type="file" id="fileInput" accept=".fbx,.obj,.glb,.gltf" style="display: none;">
+        </div>
+        <div style="margin-top: 10px;">
+            <a href="test-engine.html" style="color: #667eea; text-decoration: none; font-size: 12px;">🔧 Test Engine</a>
+        </div>
+    </div>
+    <div id="loading">
+        <div class="spinner"></div>
+        <p>Loading 3D Model...</p>
+    </div>
+    <div id="container"></div>
+    
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module" src="viewer.js"></script>
+</body>
+</html>
