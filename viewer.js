@@ -40,32 +40,54 @@ function init() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.getElementById('container').appendChild(renderer.domElement);
 
-    // Apply simple environment for reflections
+    // Improve reflections with a procedural environment
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     pmremGenerator.compileEquirectangularShader();
-    scene.environment = pmremGenerator.fromScene(new THREE.Scene()).texture;
+    
+    // Create a temporary scene for environment generation
+    const envScene = new THREE.Scene();
+    const envLight = new THREE.PointLight(0xffffff, 50, 100);
+    envLight.position.set(5, 5, 5);
+    envScene.add(envLight);
+    const envLight2 = new THREE.PointLight(0x667eea, 50, 100);
+    envLight2.position.set(-5, -5, -5);
+    envScene.add(envLight2);
+    
+    scene.environment = pmremGenerator.fromScene(envScene).texture;
 
-    // Add lights - Balanced PBR Setup
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    // Add lights - Professional Studio Setup
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambientLight);
 
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x050510, 0.8);
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x050510, 1.0);
     scene.add(hemiLight);
 
-    const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
-    mainLight.position.set(10, 20, 10);
+    // Key Light
+    const mainLight = new THREE.DirectionalLight(0xffffff, 2.0);
+    mainLight.position.set(15, 25, 15);
     mainLight.castShadow = true;
-    mainLight.shadow.mapSize.width = 2048;
-    mainLight.shadow.mapSize.height = 2048;
+    mainLight.shadow.mapSize.width = 4096; // Sharper shadows
+    mainLight.shadow.mapSize.height = 4096;
+    mainLight.shadow.camera.near = 0.5;
+    mainLight.shadow.camera.far = 100;
+    mainLight.shadow.bias = -0.0001;
     scene.add(mainLight);
 
-    const fillLight = new THREE.DirectionalLight(0x764ba2, 0.5);
-    fillLight.position.set(-10, 10, -10);
+    // Rim Light (Blue)
+    const rimLight = new THREE.SpotLight(0x667eea, 40);
+    rimLight.position.set(-20, 20, -20);
+    rimLight.angle = Math.PI / 4;
+    rimLight.penumbra = 0.5;
+    scene.add(rimLight);
+
+    // Fill Light (Purple)
+    const fillLight = new THREE.DirectionalLight(0x764ba2, 0.8);
+    fillLight.position.set(-15, 5, 10);
     scene.add(fillLight);
 
     // Subtle blue "tech" glow from below
-    const bottomLight = new THREE.PointLight(0x667eea, 20, 50);
-    bottomLight.position.set(0, -5, 0);
+    const bottomLight = new THREE.PointLight(0x667eea, 30, 60);
+    bottomLight.position.set(0, -10, 0);
     scene.add(bottomLight);
 
     // Add controls
@@ -324,25 +346,29 @@ function processLoadedModel(object, filename) {
                 const upgrade = (m) => {
                     // Detect if this is a "glow" material
                     const isGlow = (m.emissive && (m.emissive.r > 0 || m.emissive.g > 0 || m.emissive.b > 0)) || 
-                                   (m.name && m.name.toLowerCase().includes('glass'));
+                                   (m.name && (m.name.toLowerCase().includes('glass') || m.name.toLowerCase().includes('glow') || m.name.toLowerCase().includes('light')));
 
                     const newMat = new THREE.MeshStandardMaterial({
                         name: m.name,
                         color: m.color ? m.color.clone() : 0xcccccc,
                         map: m.map,
                         normalMap: m.normalMap,
-                        roughness: isGlow ? 0.1 : 0.6,
-                        metalness: isGlow ? 0.9 : 0.4,
+                        roughnessMap: m.roughnessMap || null,
+                        metalnessMap: m.metalnessMap || null,
+                        aoMap: m.aoMap || null,
+                        roughness: isGlow ? 0.05 : (m.roughness !== undefined ? m.roughness : 0.4),
+                        metalness: isGlow ? 1.0 : (m.metalness !== undefined ? m.metalness : 0.6),
                         emissive: m.emissive ? m.emissive.clone() : 0x000000,
-                        emissiveIntensity: m.emissiveIntensity || 1.0,
+                        emissiveIntensity: isGlow ? 2.5 : (m.emissiveIntensity || 1.0),
                         transparent: m.transparent || m.opacity < 1,
                         opacity: m.opacity,
-                        side: THREE.DoubleSide
+                        side: THREE.DoubleSide,
+                        envMapIntensity: 1.5 // Boost reflections
                     });
 
                     // If it's a dark color and not a glow, bump it so it's not "black hole" dark
-                    if (!isGlow && newMat.color.r < 0.05 && newMat.color.g < 0.05 && newMat.color.b < 0.05) {
-                        newMat.color.setHex(0x333333);
+                    if (!isGlow && newMat.color.r < 0.03 && newMat.color.g < 0.03 && newMat.color.b < 0.03) {
+                        newMat.color.setHex(0x2a2a2a);
                     }
 
                     return newMat;
