@@ -32,38 +32,33 @@ function init() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.getElementById('container').appendChild(renderer.domElement);
 
-    // Add lights - Professional Studio Setup
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Brighter ambient
+    // Apply simple environment for reflections
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    pmremGenerator.compileEquirectangularShader();
+    scene.environment = pmremGenerator.fromScene(new THREE.Scene()).texture;
+
+    // Add lights - Balanced PBR Setup
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
 
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x050510, 0.6);
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x050510, 0.8);
     scene.add(hemiLight);
 
-    const mainLight = new THREE.DirectionalLight(0xffffff, 3);
-    mainLight.position.set(20, 40, 20);
+    const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    mainLight.position.set(10, 20, 10);
     mainLight.castShadow = true;
     mainLight.shadow.mapSize.width = 2048;
     mainLight.shadow.mapSize.height = 2048;
-    mainLight.shadow.camera.left = -50;
-    mainLight.shadow.camera.right = 50;
-    mainLight.shadow.camera.top = 50;
-    mainLight.shadow.camera.bottom = -50;
     scene.add(mainLight);
 
-    // High intensity Point lights for r160+ physically correct units
-    const blueLight = new THREE.PointLight(0x667eea, 1000);
-    blueLight.position.set(-20, 10, -20);
-    scene.add(blueLight);
+    const fillLight = new THREE.DirectionalLight(0x764ba2, 0.5);
+    fillLight.position.set(-10, 10, -10);
+    scene.add(fillLight);
 
-    const purpleLight = new THREE.PointLight(0x764ba2, 1000);
-    purpleLight.position.set(20, 10, 20);
-    scene.add(purpleLight);
-
-    const topLight = new THREE.SpotLight(0xffffff, 2000);
-    topLight.position.set(0, 30, 0);
-    topLight.angle = Math.PI / 4;
-    topLight.penumbra = 0.3;
-    scene.add(topLight);
+    // Subtle blue "tech" glow from below
+    const bottomLight = new THREE.PointLight(0x667eea, 20, 50);
+    bottomLight.position.set(0, -5, 0);
+    scene.add(bottomLight);
 
     // Add controls
     controls = new OrbitControls(camera, renderer.domElement);
@@ -210,11 +205,11 @@ function processLoadedModel(object, filename) {
     }
     
     model = object;
-    scene.add(model); // Add to scene first for matrix updates
+    scene.add(model);
     
-    console.log('Model loaded:', filename);
+    console.log('Processing model:', filename);
     
-    // Reset model transformations to get raw bounds
+    // 1. Reset and Force Bounds Calc
     model.position.set(0, 0, 0);
     model.scale.set(1, 1, 1);
     model.rotation.set(0, 0, 0);
@@ -225,35 +220,20 @@ function processLoadedModel(object, filename) {
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
     
-    console.log('Original Bounds:', size, 'Center:', center);
-    
-    // Auto-scale to a comfortable size (target max dimension of 20 units)
-    const targetDim = 20;
+    // 2. Center and Hero Scale (Target 15 units height)
+    const targetDim = 15;
     const scale = targetDim / (maxDim || 1);
     model.scale.set(scale, scale, scale);
-
-    // Apply centered position compensating for the new scale
-    // WorldCenter = ModelPos + (Scale * OriginalCenter)
-    // We want WorldCenter to be 0
-    // ModelPos = -(Scale * OriginalCenter)
     model.position.x = -center.x * scale;
-    model.position.y = -center.y * scale;
+    model.position.y = -center.y * scale + (size.y * scale) / 2; // Feet on floor
     model.position.z = -center.z * scale;
     
-    // Position the whole model so its bottom is on the grid (y=0)
-    // After centering, the bottom is at (-size.y/2 * scale)
-    // We move it up by (size.y * scale) / 2
-    model.position.y += (size.y * scale) / 2;
-
-    // Update Grid size based on model size
-    if (gridHelper) {
-        scene.remove(gridHelper);
-    }
-    const gridDim = Math.ceil(targetDim * 2);
-    gridHelper = new THREE.GridHelper(gridDim, 20, 0x667eea, 0x222222);
+    // 3. Grid Update
+    if (gridHelper) scene.remove(gridHelper);
+    gridHelper = new THREE.GridHelper(targetDim * 2, 20, 0x667eea, 0x222222);
     scene.add(gridHelper);
 
-    // Material & Shadow Upgrade
+    // 4. Material Extraction & Upgrade
     model.traverse((child) => {
         if (child.isMesh) {
             child.castShadow = true;
@@ -261,27 +241,38 @@ function processLoadedModel(object, filename) {
             child.frustumCulled = false;
             
             if (child.material) {
-                const materials = Array.isArray(child.material) ? child.material : [child.material];
-                
-                materials.forEach((mat, index) => {
-                    console.log(`Mesh: ${child.name} | Material ${index}: ${mat.name} | Color: ${mat.color?.getHexString()}`);
-                    
-                    // Instead of replacing, let's just update the existing material
-                    // to see if original colors return.
-                    mat.side = THREE.DoubleSide;
-                    
-                    // If it has vertex colors, enable them
-                    if (child.geometry && child.geometry.attributes.color) {
-                        mat.vertexColors = true;
+                const upgrade = (m) => {
+                    // Detect if this is a "glow" material
+                    const isGlow = (m.emissive && (m.emissive.r > 0 || m.emissive.g > 0 || m.emissive.b > 0)) || 
+                                   (m.name && m.name.toLowerCase().includes('glass'));
+
+                    const newMat = new THREE.MeshStandardMaterial({
+                        name: m.name,
+                        color: m.color ? m.color.clone() : 0xcccccc,
+                        map: m.map,
+                        normalMap: m.normalMap,
+                        roughness: isGlow ? 0.1 : 0.6,
+                        metalness: isGlow ? 0.9 : 0.4,
+                        emissive: m.emissive ? m.emissive.clone() : 0x000000,
+                        emissiveIntensity: m.emissiveIntensity || 1.0,
+                        transparent: m.transparent || m.opacity < 1,
+                        opacity: m.opacity,
+                        side: THREE.DoubleSide
+                    });
+
+                    // If it's a dark color and not a glow, bump it so it's not "black hole" dark
+                    if (!isGlow && newMat.color.r < 0.05 && newMat.color.g < 0.05 && newMat.color.b < 0.05) {
+                        newMat.color.setHex(0x333333);
                     }
-                    
-                    // Ensure opacity is preserved
-                    if (mat.opacity < 1) {
-                        mat.transparent = true;
-                    }
-                    
-                    mat.needsUpdate = true;
-                });
+
+                    return newMat;
+                };
+
+                if (Array.isArray(child.material)) {
+                    child.material = child.material.map(upgrade);
+                } else {
+                    child.material = upgrade(child.material);
+                }
             }
 
             if (child.geometry) {
@@ -290,25 +281,16 @@ function processLoadedModel(object, filename) {
         }
     });
 
-    // Adjust camera & controls
-    const camDist = targetDim * 1.5;
-    camera.position.set(camDist, camDist, camDist);
-    camera.lookAt(0, targetDim / 2, 0); // Look at center of model
+    // 5. Camera & Control Focus
+    camera.position.set(targetDim, targetDim * 0.7, targetDim);
     controls.target.set(0, targetDim / 2, 0);
     controls.update();
+
+    // 6. UI Update
+    document.getElementById('loading').classList.add('hidden');
+    document.querySelector('#info p').textContent = `Model: ${filename} (${countVertices(model)} vertices)`;
     
-    // UI Updates
-    const loadingElement = document.getElementById('loading');
-    loadingElement.classList.add('hidden');
-    
-    const infoText = document.querySelector('#info p');
-    infoText.textContent = `Model: ${filename} (${countVertices(model)} vertices)`;
-    
-    console.log('Processing complete. Scale:', scale);
-    
-    // Debug: Add a bounding box helper to see where it is
-    // const helper = new THREE.BoxHelper(model, 0xffff00);
-    // scene.add(helper);
+    console.log('Processing Complete.');
 }
 
 function loadModel() {
