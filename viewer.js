@@ -5,10 +5,11 @@ import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 let scene, camera, renderer, controls;
-let model, gridHelper;
+let model, gridHelper, skeletonHelper;
 let raycaster, mouse;
 let selectedObject = null;
 let originalMaterials = new Map();
+let bones = [];
 
 function init() {
     // Create scene
@@ -365,12 +366,100 @@ function processLoadedModel(object, filename) {
     controls.target.set(0, targetDim / 2, 0);
     controls.update();
 
+    // 7. Skeleton Analysis
+    setupSkeleton(model);
+
     // 6. UI Update
     document.getElementById('loading').classList.add('hidden');
     document.querySelector('#info p').textContent = `Model: ${filename} (${countVertices(model)} vertices)`;
     
     console.log('Processing Complete.');
 }
+
+function setupSkeleton(object) {
+    if (skeletonHelper) {
+        scene.remove(skeletonHelper);
+    }
+
+    bones = [];
+    object.traverse((child) => {
+        if (child.isBone) {
+            bones.push(child);
+        }
+    });
+
+    if (bones.length > 0) {
+        skeletonHelper = new THREE.SkeletonHelper(object);
+        skeletonHelper.visible = false; // Hidden by default
+        scene.add(skeletonHelper);
+        console.log(`Skeleton found with ${bones.length} bones.`);
+        
+        // Analyze movement potential
+        analyzeBoneMovements(bones);
+        updateSkeletonUI(true);
+    } else {
+        console.log('No skeleton found in model. Analyzing hierarchy for mechanical joints...');
+        analyzeMechanicalHierarchy(object);
+        updateSkeletonUI(false);
+    }
+}
+
+function analyzeBoneMovements(bones) {
+    console.log('--- Bone Movement Analysis ---');
+    const structure = {};
+    bones.forEach(bone => {
+        const name = bone.name.toLowerCase();
+        let group = 'other';
+        if (name.includes('leg') || name.includes('thigh') || name.includes('calf') || name.includes('foot')) group = 'legs';
+        else if (name.includes('arm') || name.includes('shoulder') || name.includes('hand') || name.includes('elbow')) group = 'arms';
+        else if (name.includes('spine') || name.includes('hips') || name.includes('root') || name.includes('pelvis')) group = 'core';
+        else if (name.includes('head') || name.includes('neck')) group = 'head';
+
+        if (!structure[group]) structure[group] = [];
+        structure[group].push(bone.name);
+    });
+
+    for (const [group, names] of Object.entries(structure)) {
+        console.log(`${group.toUpperCase()}: Found ${names.length} control points. Recommended for ${group === 'legs' ? 'Locomotion' : group === 'arms' ? 'Manipulation' : 'Stabilization'} animation.`);
+    }
+}
+
+function analyzeMechanicalHierarchy(object) {
+    // For models without weights but structured for animation
+    let jointCount = 0;
+    const mechanicalJoints = [];
+    
+    object.traverse((child) => {
+        // If an object has children and is not the root, it's likely a pivot point
+        if (child.children.length > 0 && child !== object) {
+            jointCount++;
+            mechanicalJoints.push(child.name);
+        }
+    });
+    
+    console.log(`Found ${jointCount} potential mechanical joints.`);
+    if (jointCount > 0) {
+        console.log('Recommended Animation Strategy: Hierarchical Rotation (Forward Kinematics)');
+    }
+}
+
+function updateSkeletonUI(hasSkeleton) {
+    const skeletonSection = document.getElementById('skeleton-section');
+    if (skeletonSection) {
+        skeletonSection.style.display = 'block';
+        const status = document.getElementById('skeleton-status');
+        if (status) {
+            status.textContent = hasSkeleton ? `Rig Detected: ${bones.length} Bones` : 'No Rig detected (Mechanical Hierarchy Only)';
+        }
+    }
+}
+
+function toggleSkeleton() {
+    if (skeletonHelper) {
+        skeletonHelper.visible = !skeletonHelper.visible;
+    }
+}
+window.toggleSkeleton = toggleSkeleton;
 
 function loadModel() {
     const loader = new FBXLoader();
