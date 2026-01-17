@@ -258,36 +258,32 @@ function processLoadedModel(object, filename) {
         if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
-            child.frustumCulled = false; // Prevents parts from disappearing at certain angles
+            child.frustumCulled = false;
             
             if (child.material) {
-                const upgradeMaterial = (mat) => {
-                    // Force a visible color if the current one is too dark
-                    let color = mat.color ? mat.color.clone() : new THREE.Color(0xcccccc);
-                    if (color.r < 0.1 && color.g < 0.1 && color.b < 0.1) {
-                        color = new THREE.Color(0x888888);
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                
+                materials.forEach((mat, index) => {
+                    console.log(`Mesh: ${child.name} | Material ${index}: ${mat.name} | Color: ${mat.color?.getHexString()}`);
+                    
+                    // Instead of replacing, let's just update the existing material
+                    // to see if original colors return.
+                    mat.side = THREE.DoubleSide;
+                    
+                    // If it has vertex colors, enable them
+                    if (child.geometry && child.geometry.attributes.color) {
+                        mat.vertexColors = true;
                     }
-
-                    return new THREE.MeshStandardMaterial({
-                        color: color,
-                        map: mat.map,
-                        normalMap: mat.normalMap,
-                        roughness: 0.4,
-                        metalness: 0.6,
-                        side: THREE.DoubleSide,
-                        transparent: mat.transparent || (mat.opacity < 1),
-                        opacity: mat.opacity
-                    });
-                };
-
-                if (Array.isArray(child.material)) {
-                    child.material = child.material.map(upgradeMaterial);
-                } else {
-                    child.material = upgradeMaterial(child.material);
-                }
+                    
+                    // Ensure opacity is preserved
+                    if (mat.opacity < 1) {
+                        mat.transparent = true;
+                    }
+                    
+                    mat.needsUpdate = true;
+                });
             }
 
-            // Ensure smooth shading
             if (child.geometry) {
                 child.geometry.computeVertexNormals();
             }
